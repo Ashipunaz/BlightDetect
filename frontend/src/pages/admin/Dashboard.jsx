@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import axios from '../../utils/axios';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../context/AuthContext';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
@@ -10,18 +11,32 @@ export default function AdminDashboard() {
     recentPredictions: []
   });
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
+    if (!user || user.role !== 'admin') {
+      navigate('/login');
+      return;
+    }
     fetchStats();
-  }, []);
+  }, [user, navigate]);
 
   const fetchStats = async () => {
     try {
       const response = await axios.get('/api/admin/stats');
       setStats(response.data);
     } catch (error) {
-      toast.error('Failed to fetch dashboard statistics');
       console.error('Error fetching stats:', error);
+      if (error.response?.status === 401) {
+        toast.error('Please log in again');
+        navigate('/login');
+      } else if (error.response?.status === 403) {
+        toast.error('Access denied. Admin privileges required.');
+        navigate('/dashboard');
+      } else {
+        toast.error(error.response?.data?.message || 'Failed to fetch dashboard statistics');
+      }
     } finally {
       setLoading(false);
     }

@@ -1,31 +1,59 @@
 import React, { useState, useEffect } from 'react';
 import axios from '../../utils/axios';
 import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+
+// Get the API URL from Vite's environment variables
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export default function Predictions() {
   const [predictions, setPredictions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedPrediction, setSelectedPrediction] = useState(null);
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
+    if (!user || user.role !== 'admin') {
+      navigate('/login');
+      return;
+    }
     fetchPredictions();
-  }, []);
+  }, [user, navigate]);
 
   const fetchPredictions = async () => {
     try {
       const response = await axios.get('/api/admin/predictions');
       setPredictions(response.data);
     } catch (error) {
-      toast.error('Failed to fetch predictions');
       console.error('Error fetching predictions:', error);
+      if (error.response?.status === 401) {
+        toast.error('Please log in again');
+        navigate('/login');
+      } else if (error.response?.status === 403) {
+        toast.error('Access denied. Admin privileges required.');
+        navigate('/dashboard');
+      } else {
+        toast.error(error.response?.data?.message || 'Failed to fetch predictions');
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  const getImageUrl = (imagePath) => {
+    if (!imagePath) return '/placeholder-image.png';
+    // If the image path is a full URL, use it as is
+    if (imagePath.startsWith('http')) return imagePath;
+    // The backend stores paths like 'uploads/filename.jpg'
+    return `${API_URL}/${imagePath}`;
+  };
+
   const handleImageError = (e) => {
-    e.target.src = '/placeholder-image.png'; // Replace with a default image
-    toast.error('Failed to load image');
+    console.error('Image failed to load:', e.target.src);
+    e.target.src = '/placeholder-image.png';
+    toast.error('Failed to load image. Please try again later.');
   };
 
   if (loading) {
@@ -78,21 +106,21 @@ export default function Predictions() {
                 <tr key={prediction._id}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">
-                      {prediction.user.name}
+                      {prediction.user?.name || 'Deleted User'}
                     </div>
                     <div className="text-sm text-gray-500">
-                      {prediction.user.email}
+                      {prediction.user?.email || 'N/A'}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{prediction.disease}</div>
+                    <div className="text-sm text-gray-900">{prediction.disease || 'Unknown'}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{prediction.confidence}%</div>
+                    <div className="text-sm text-gray-900">{prediction.confidence || 0}%</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
-                      {new Date(prediction.createdAt).toLocaleDateString()}
+                      {prediction.createdAt ? new Date(prediction.createdAt).toLocaleDateString() : 'N/A'}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -130,32 +158,32 @@ export default function Predictions() {
               <div>
                 <label className="block text-sm font-medium text-gray-700">User</label>
                 <div className="mt-1 text-sm text-gray-900">
-                  {selectedPrediction.user.name} ({selectedPrediction.user.email})
+                  {selectedPrediction.user?.name || 'Deleted User'} ({selectedPrediction.user?.email || 'N/A'})
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Disease</label>
-                <div className="mt-1 text-sm text-gray-900">{selectedPrediction.disease}</div>
+                <div className="mt-1 text-sm text-gray-900">{selectedPrediction.disease || 'Unknown'}</div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Confidence</label>
-                <div className="mt-1 text-sm text-gray-900">{selectedPrediction.confidence}%</div>
+                <div className="mt-1 text-sm text-gray-900">{selectedPrediction.confidence || 0}%</div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Date</label>
                 <div className="mt-1 text-sm text-gray-900">
-                  {new Date(selectedPrediction.createdAt).toLocaleString()}
+                  {selectedPrediction.createdAt ? new Date(selectedPrediction.createdAt).toLocaleString() : 'N/A'}
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Recommendations</label>
-                <div className="mt-1 text-sm text-gray-900">{selectedPrediction.recommendations}</div>
+                <div className="mt-1 text-sm text-gray-900">{selectedPrediction.recommendations || 'No recommendations available'}</div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Image</label>
                 <div className="mt-2">
                   <img
-                    src={`${process.env.VITE_API_URL}/uploads/${selectedPrediction.image}`}
+                    src={getImageUrl(selectedPrediction.image)}
                     alt="Plant"
                     className="max-w-full h-auto rounded-lg"
                     onError={handleImageError}

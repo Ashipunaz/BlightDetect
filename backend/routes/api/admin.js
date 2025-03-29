@@ -18,8 +18,8 @@ router.get('/stats', auth, isAdmin, async (req, res) => {
 
     // Format recent predictions
     const formattedPredictions = recentPredictions.map(p => ({
-      user: p.user.name,
-      disease: p.disease,
+      user: p.user?.name || 'Deleted User',
+      disease: p.disease || 'Unknown',
       date: p.createdAt
     }));
 
@@ -30,7 +30,7 @@ router.get('/stats', auth, isAdmin, async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching admin stats:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Server error while fetching admin statistics' });
   }
 });
 
@@ -45,7 +45,7 @@ router.get('/users', auth, isAdmin, async (req, res) => {
     res.json(users);
   } catch (error) {
     console.error('Error fetching users:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Server error while fetching users' });
   }
 });
 
@@ -80,7 +80,7 @@ router.patch('/users/:userId', auth, isAdmin, async (req, res) => {
     res.json({ message: 'User updated successfully' });
   } catch (error) {
     console.error('Error updating user:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Server error while updating user' });
   }
 });
 
@@ -114,7 +114,7 @@ router.patch('/users/:userId/role', auth, isAdmin, async (req, res) => {
     res.json({ message: 'User role updated successfully' });
   } catch (error) {
     console.error('Error updating user role:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Server error while updating user role' });
   }
 });
 
@@ -142,7 +142,7 @@ router.delete('/users/:userId', auth, isAdmin, async (req, res) => {
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
     console.error('Error deleting user:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Server error while deleting user' });
   }
 });
 
@@ -151,14 +151,24 @@ router.get('/predictions', auth, isAdmin, async (req, res) => {
   try {
     const predictions = await Prediction.find()
       .sort({ createdAt: -1 })
-      .populate('user', 'name email')
+      .populate({
+        path: 'user',
+        select: 'name email',
+        options: { lean: true }
+      })
       .lean()
       .exec();
 
-    res.json(predictions);
+    // Handle predictions with deleted users
+    const formattedPredictions = predictions.map(prediction => ({
+      ...prediction,
+      user: prediction.user || { name: 'Deleted User', email: 'N/A' }
+    }));
+
+    res.json(formattedPredictions);
   } catch (error) {
     console.error('Error fetching predictions:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Server error while fetching predictions' });
   }
 });
 

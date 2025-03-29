@@ -35,11 +35,14 @@ export const AuthProvider = ({ children }) => {
       const response = await axios.post('/api/auth/login', { email, password });
       const { token, user } = response.data;
       
+      // Store token in localStorage
       localStorage.setItem('token', token);
+      
+      // Update state
       setToken(token);
       setUser(user);
 
-      // Return the user role for redirection
+      // Return success and role for redirection
       return { 
         success: true, 
         role: user.role 

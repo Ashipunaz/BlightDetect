@@ -6,14 +6,14 @@ const auth = async (req, res, next) => {
     const token = req.header('Authorization')?.replace('Bearer ', '');
     
     if (!token) {
-      return res.status(401).json({ message: 'Authentication required' });
+      return res.status(401).json({ message: 'Authentication required. Please log in.' });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.userId).select('-password');
 
     if (!user) {
-      return res.status(401).json({ message: 'User not found' });
+      return res.status(401).json({ message: 'User not found. Please log in again.' });
     }
 
     // Update last login time
@@ -24,12 +24,21 @@ const auth = async (req, res, next) => {
     next();
   } catch (err) {
     console.error('Auth middleware error:', err);
-    res.status(401).json({ message: 'Authentication failed' });
+    if (err.name === 'JsonWebTokenError') {
+      return res.status(401).json({ message: 'Invalid token. Please log in again.' });
+    }
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).json({ message: 'Token expired. Please log in again.' });
+    }
+    res.status(401).json({ message: 'Authentication failed. Please try again.' });
   }
 };
 
 const isAdmin = (req, res, next) => {
-  if (!req.user || req.user.role !== 'admin') {
+  if (!req.user) {
+    return res.status(401).json({ message: 'Authentication required. Please log in.' });
+  }
+  if (req.user.role !== 'admin') {
     return res.status(403).json({ message: 'Access denied. Admin privileges required.' });
   }
   next();
